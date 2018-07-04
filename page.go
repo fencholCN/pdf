@@ -481,8 +481,14 @@ func (p Page) GetPlainText(fonts map[string]*Font) (result string, err error) {
 	}
 
 	var textBuilder bytes.Buffer
-	showText := func(s string) {
-		for _, ch := range enc.Decode(s) {
+	showText := func(s string, d bool) {
+		var plain string
+		if d {
+			plain = enc.Decode(s)
+		} else {
+			plain = s
+		}
+		for _, ch := range plain {
 			_, err := textBuilder.WriteRune(ch)
 			if err != nil {
 				panic(err)
@@ -501,7 +507,7 @@ func (p Page) GetPlainText(fonts map[string]*Font) (result string, err error) {
 		default:
 			return
 		case "T*": // move to start of next line
-			showText("\n")
+			showText("\n", false)
 		case "Tf": // set text font and size
 			if len(args) != 2 {
 				panic("bad TL")
@@ -525,13 +531,13 @@ func (p Page) GetPlainText(fonts map[string]*Font) (result string, err error) {
 			if len(args) != 1 {
 				panic("bad Tj operator")
 			}
-			showText(args[0].RawString())
+			showText(args[0].RawString(), true)
 		case "TJ": // show text, allowing individual glyph positioning
 			v := args[0]
 			for i := 0; i < v.Len(); i++ {
 				x := v.Index(i)
 				if x.Kind() == String {
-					showText(x.RawString())
+					showText(x.RawString(), true)
 				}
 			}
 		}
@@ -550,9 +556,15 @@ func (p Page) Content() Content {
 	}
 
 	var text []Text
-	showText := func(s string) {
+	showText := func(s string, d bool) {
+		var plain string
+		if d {
+			plain = enc.Decode(s)
+		} else {
+			plain = s
+		}
 		n := 0
-		for _, ch := range enc.Decode(s) {
+		for _, ch := range plain {
 			Trm := matrix{{g.Tfs * g.Th, 0, 0}, {0, g.Tfs, 0}, {0, g.Trise, 1}}.mul(g.Tm).mul(g.CTM)
 			w0 := g.Tf.Width(int(s[n]))
 			n++
@@ -689,20 +701,20 @@ func (p Page) Content() Content {
 			if len(args) != 1 {
 				panic("bad Tj operator")
 			}
-			showText(args[0].RawString())
+			showText(args[0].RawString(), true)
 
 		case "TJ": // show text, allowing individual glyph positioning
 			v := args[0]
 			for i := 0; i < v.Len(); i++ {
 				x := v.Index(i)
 				if x.Kind() == String {
-					showText(x.RawString())
+					showText(x.RawString(), true)
 				} else {
 					tx := -x.Float64() / 1000 * g.Tfs * g.Th
 					g.Tm = matrix{{1, 0, 0}, {0, 1, 0}, {tx, 0, 1}}.mul(g.Tm)
 				}
 			}
-			showText("\n")
+			// showText("\n", false)
 
 		case "TL": // set text leading
 			if len(args) != 1 {
